@@ -161,7 +161,10 @@ def run_benchmark_command(
     """Run the ReAct baseline on multiple tasks from the config selection."""
     app_config = load_app_config(config)
     dataset = DABenchPublicDataset(app_config.dataset.root_path)
-    task_total = len(dataset.iter_tasks())
+    if app_config.dataset.task_ids:
+        task_total = len(dataset.iter_tasks(task_ids=list(app_config.dataset.task_ids)))
+    else:
+        task_total = len(dataset.iter_tasks())
     if limit is not None:
         task_total = min(task_total, limit)
     effective_workers = app_config.run.max_workers
@@ -229,14 +232,11 @@ def run_benchmark_command(
                 ),
             )
 
-        try:
-            run_output_dir, artifacts = run_benchmark(
-                config=app_config,
-                limit=limit,
-                progress_callback=on_task_complete,
-            )
-        except (ValueError, FileExistsError) as exc:
-            raise typer.BadParameter(str(exc), param_hint="run.run_id") from exc
+        run_output_dir, artifacts = run_benchmark(
+            config=app_config,
+            limit=limit,
+            progress_callback=on_task_complete,
+        )
         progress.update(
             progress_task_id,
             completed=task_total,

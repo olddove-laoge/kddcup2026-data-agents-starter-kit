@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git remote *)",
+      "WebFetch(domain:dataagent.top)",
+      "Bash(curl *)",
+      "Bash(python *)",
+      "Bash(uv run *)"
+    ]
+  }
+}

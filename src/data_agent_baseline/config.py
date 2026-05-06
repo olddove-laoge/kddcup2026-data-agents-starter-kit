@@ -19,6 +19,7 @@ def _default_run_output_dir() -> Path:
 @dataclass(frozen=True, slots=True)
 class DatasetConfig:
     root_path: Path = field(default_factory=_default_dataset_root)
+    task_ids: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True, slots=True)
@@ -64,8 +65,15 @@ def load_app_config(config_path: Path) -> AppConfig:
     agent_payload = payload.get("agent", {})
     run_payload = payload.get("run", {})
 
+    raw_task_ids = dataset_payload.get("task_ids", dataset_defaults.task_ids)
+    if raw_task_ids is None:
+        task_ids = dataset_defaults.task_ids
+    else:
+        task_ids = tuple(str(task_id) for task_id in raw_task_ids)
+
     dataset_config = DatasetConfig(
         root_path=_path_value(dataset_payload.get("root_path"), dataset_defaults.root_path),
+        task_ids=task_ids,
     )
     agent_config = AgentConfig(
         model=str(agent_payload.get("model", agent_defaults.model)),

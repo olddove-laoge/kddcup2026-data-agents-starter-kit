@@ -71,12 +71,12 @@ def build_model_adapter(config: AppConfig):
 
 
 def _write_json(path: Path, payload: dict[str, Any]) -> None:
-    path.write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n")
+    path.write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
 
 
 def _write_csv(path: Path, columns: list[str], rows: list[list[Any]]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
-    with path.open("w", newline="") as handle:
+    with path.open("w", newline="", encoding="utf-8") as handle:
         writer = csv.writer(handle)
         writer.writerow(columns)
         for row in rows:
@@ -219,7 +219,10 @@ def run_benchmark(
     effective_run_id, run_output_dir = create_run_output_dir(config.run.output_dir, run_id=config.run.run_id)
 
     dataset = DABenchPublicDataset(config.dataset.root_path)
-    tasks = dataset.iter_tasks()
+    if config.dataset.task_ids:
+        tasks = dataset.iter_tasks(task_ids=list(config.dataset.task_ids))
+    else:
+        tasks = dataset.iter_tasks()
     if limit is not None:
         tasks = tasks[:limit]
 

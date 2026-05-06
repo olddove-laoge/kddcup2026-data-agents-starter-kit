@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import re
 from dataclasses import dataclass
+from decimal import Decimal, InvalidOperation
 
 from data_agent_baseline.agents.model import ModelAdapter, ModelMessage, ModelStep
 from data_agent_baseline.agents.prompt import (
@@ -44,6 +45,28 @@ def _load_single_json_object(text: str) -> dict[str, object]:
     return payload
 
 
+def _validate_answer_action_input(action_input: dict[str, object]) -> None:
+    columns = action_input.get("columns")
+    rows = action_input.get("rows")
+    if not isinstance(columns, list) or not columns:
+        raise ValueError("answer.columns must be a non-empty list.")
+    if any(not isinstance(column, str) or not column.strip() for column in columns):
+        raise ValueError("answer.columns must contain non-empty strings.")
+
+    if not isinstance(rows, list) or not rows:
+        raise ValueError("answer.rows must be a non-empty list.")
+
+    expected_width = len(columns)
+    for row in rows:
+        if not isinstance(row, list):
+            raise ValueError("answer.rows must be a list of row lists.")
+        if len(row) != expected_width:
+            raise ValueError("Each answer row length must match columns length.")
+
+    if not any(str(cell).strip() for row in rows for cell in row):
+        raise ValueError("answer.rows must contain at least one non-empty value.")
+
+
 def parse_model_step(raw_response: str) -> ModelStep:
     normalized = _strip_json_fence(raw_response)
     payload = _load_single_json_object(normalized)
@@ -57,6 +80,9 @@ def parse_model_step(raw_response: str) -> ModelStep:
         raise ValueError("action must be a non-empty string.")
     if not isinstance(action_input, dict):
         raise ValueError("action_input must be a JSON object.")
+
+    if action == "answer":
+        _validate_answer_action_input(action_input)
 
     return ModelStep(
         thought=thought,
@@ -120,10 +146,19 @@ class ReActAgent:
                     state.answer = tool_result.answer
                     break
             except Exception as exc:
+                error_text = str(exc)
+                hint: str | None = None
+                if "action_input must be a JSON object" in error_text:
+                    hint = "Use action_input as a JSON object. For execute_python, pass {\"code\": \"...\"}."
+                elif "file is not a database" in error_text:
+                    hint = "execute_context_sql only works with SQLite/DB files. Use read_csv/read_json or execute_python for non-DB files."
+
                 observation = {
                     "ok": False,
-                    "error": str(exc),
+                    "error": error_text,
                 }
+                if hint is not None:
+                    observation["hint"] = hint
                 state.steps.append(
                     StepRecord(
                         step_index=step_index,
